@@ -1,3 +1,4 @@
+#import <TargetConditionals.h>
 #import "ThermalPrinter.h"
 #import "ConnecterManager.h"
 
@@ -29,6 +30,11 @@
 
 - (void)handleMethodCall:(FlutterMethodCall*)call result:(FlutterResult)result {
   NSLog(@"call method -> %@", call.method);
+#if TARGET_OS_SIMULATOR
+  // Gprinter's libGSDK.a ships no arm64 simulator slice, so the SDK is not linked in
+  // simulator builds (see the Podfile). Bluetooth is unavailable in the simulator anyway.
+  [self handleMethodCallWithoutSDK:call result:result];
+#else
     
   if ([@"state" isEqualToString:call.method]) {
     result(nil);
@@ -117,8 +123,25 @@
            result(e);
        }
   }
+#endif
 }
 
+#if TARGET_OS_SIMULATOR
+- (void)handleMethodCallWithoutSDK:(FlutterMethodCall*)call result:(FlutterResult)result {
+  if ([@"isAvailable" isEqualToString:call.method]
+      || [@"isConnected" isEqualToString:call.method]
+      || [@"isOn" isEqualToString:call.method]) {
+    result(@(NO));
+  } else if ([@"connect" isEqualToString:call.method]) {
+    NSLog(@"thermal_printer: Bluetooth printing is not available in the iOS Simulator");
+    [self updateConnectState:CONNECT_STATE_FAILT];
+    result(nil);
+  } else {
+    // state / startScan / stopScan / disconnect / writeData: nothing to do without a radio.
+    result(nil);
+  }
+}
+#else
 -(void)startScan {
     [Manager scanForPeripheralsWithServices:nil options:nil discover:^(CBPeripheral * _Nullable peripheral, NSDictionary<NSString *,id> * _Nullable advertisementData, NSNumber * _Nullable RSSI) {
         if (peripheral.name != nil) {
@@ -132,6 +155,7 @@
     }];
     
 }
+#endif
 
 -(void)updateConnectState:(ConnectState)state {
     dispatch_async(dispatch_get_main_queue(), ^{

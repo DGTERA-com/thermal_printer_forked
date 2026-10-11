@@ -4,7 +4,12 @@
 //
 //
 
+#import <TargetConditionals.h>
 #import "ConnecterManager.h"
+
+// GSDK (libGSDK.a) has no arm64 simulator slice and is not linked in simulator builds;
+// ThermalPrinterPlugin never touches ConnecterManager there.
+#if !TARGET_OS_SIMULATOR
 
 @interface ConnecterManager(){
     ConnectMethod currentConnMethod;
@@ -106,3 +111,5 @@ static dispatch_once_t once;
 }
 
 @end
+
+#endif // !TARGET_OS_SIMULATOR
